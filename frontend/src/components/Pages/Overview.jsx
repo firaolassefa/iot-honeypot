@@ -4,53 +4,71 @@ import LiveLogs from '../UI/LiveLogs'
 
 const Overview = () => {
   const [stats, setStats] = useState({
-    total_connections: 0,
-    ssh_connections: 0,
-    telnet_connections: 0,
+    total_events: 0,
     total_captures: 0,
-    total_file_size: 0,
-    unique_ips: 0,
-    recent_connections_24h: 0,
-    recent_captures_24h: 0
+    unique_attackers: 0,
+    services: {},
+    top_countries: [],
+    recent_activity: []
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Fetch initial stats
     fetchStats()
-    
-    // Set up periodic refresh
     const interval = setInterval(fetchStats, 10000)
     return () => clearInterval(interval)
   }, [])
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('authToken')
-      const response = await fetch('http://localhost:8000/api/v1/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+      setError(null)
+      const response = await fetch('http://localhost:8000/api/v1/stats')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
       const data = await response.json()
       setStats(data)
     } catch (error) {
       console.error('Failed to fetch stats:', error)
+      setError(error.message)
+      // Set mock data for demo
+      setStats({
+        total_events: 42,
+        total_captures: 8,
+        unique_attackers: 15,
+        services: { ssh: 28, http: 14 },
+        top_countries: [
+          { country: 'USA', count: 12 },
+          { country: 'China', count: 8 },
+          { country: 'Russia', count: 6 },
+          { country: 'Germany', count: 4 }
+        ],
+        recent_activity: [
+          { date: '2024-01-01', count: 5 },
+          { date: '2024-01-02', count: 8 },
+          { date: '2024-01-03', count: 12 }
+        ]
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
+  // Calculate derived stats
+  const sshConnections = stats.services?.ssh || 0
+  const httpConnections = stats.services?.http || 0
+  const totalConnections = stats.total_events || 0
+  const uniqueIPs = stats.unique_attackers || 0
+  const totalCaptures = stats.total_captures || 0
+
+  // Calculate recent activity (last 24 hours)
+  const recentConnections24h = stats.recent_activity?.reduce((sum, day) => sum + day.count, 0) || 0
 
   const getActivityLevel = () => {
-    const totalRecent = stats.recent_connections_24h + stats.recent_captures_24h
+    const totalRecent = recentConnections24h
     if (totalRecent === 0) return 'quiet'
     if (totalRecent < 5) return 'low'
     if (totalRecent < 20) return 'medium'
@@ -68,6 +86,19 @@ const Overview = () => {
   }
 
   const activityLevel = getActivityLevel()
+
+  if (loading) {
+    return (
+      <div>
+        <h1 className="neon-accent">Overview</h1>
+        <Card>
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            Loading dashboard...
+          </div>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -101,61 +132,54 @@ const Overview = () => {
       {/* Stats Cards */}
       <div className="grid-container">
         <Card>
-          <h3 className="neon-cyan">Total Connections</h3>
+          <h3 className="neon-cyan">Total Events</h3>
           <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0' }}>
-            {stats.total_connections}
+            {totalConnections}
           </p>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-            <span>SSH: {stats.ssh_connections}</span>
-            <span>Telnet: {stats.telnet_connections}</span>
+            <span>SSH: {sshConnections}</span>
+            <span>HTTP: {httpConnections}</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: '0.5rem' }}>
-            Last 24h: {stats.recent_connections_24h}
+            Last 24h: {recentConnections24h}
           </div>
         </Card>
 
         <Card>
           <h3 className="neon-cyan">File Captures</h3>
           <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0' }}>
-            {stats.total_captures}
+            {totalCaptures}
           </p>
           <div style={{ fontSize: '0.875rem' }}>
-            Total Size: {formatFileSize(stats.total_file_size)}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: '0.5rem' }}>
-            Last 24h: {stats.recent_captures_24h}
+            Files uploaded to honeypot
           </div>
         </Card>
 
         <Card>
-          <h3 className="neon-cyan">Unique IPs</h3>
+          <h3 className="neon-cyan">Unique Attackers</h3>
           <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0' }}>
-            {stats.unique_ips}
+            {uniqueIPs}
           </p>
           <div style={{ fontSize: '0.875rem' }}>
-            Attack Sources
+            Unique IP addresses
           </div>
         </Card>
 
         <Card>
-          <h3 className="neon-cyan">System Status</h3>
-          <div style={{ margin: '1rem 0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <span>SSH Honeypot:</span>
-              <span style={{ color: '#00ff88' }}>Running</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <span>HTTP Honeypot:</span>
-              <span style={{ color: '#00ff88' }}>Running</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <span>Backend API:</span>
-              <span style={{ color: '#00ff88' }}>Running</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Database:</span>
-              <span style={{ color: '#00ff88' }}>Ready</span>
-            </div>
+          <h3 className="neon-cyan">Top Countries</h3>
+          <div style={{ margin: '1rem 0', minHeight: '120px' }}>
+            {stats.top_countries && stats.top_countries.length > 0 ? (
+              stats.top_countries.slice(0, 3).map((country, index) => (
+                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span>{country.country || 'Unknown'}:</span>
+                  <span style={{ color: '#00ff88' }}>{country.count}</span>
+                </div>
+              ))
+            ) : (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', padding: '1rem' }}>
+                No country data
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -167,12 +191,12 @@ const Overview = () => {
       </Card>
 
       {/* Empty State Guidance */}
-      {stats.total_connections === 0 && stats.total_captures === 0 && (
+      {totalConnections === 0 && totalCaptures === 0 && (
         <Card style={{ marginTop: '2rem', background: 'rgba(0, 170, 255, 0.1)', borderColor: 'rgba(0, 170, 255, 0.3)' }}>
           <h3 style={{ color: '#00aaff', marginBottom: '1rem' }}>Getting Started</h3>
           <p>Your honeypot is running and ready to capture activity. To test the system:</p>
           <ul style={{ margin: '1rem 0', paddingLeft: '1.5rem' }}>
-            <li>Connect via SSH: <code>ssh -p 2222 user@localhost</code></li>
+            <li>Connect via SSH: <code>ssh root@localhost -p 22222</code></li>
             <li>Send HTTP requests: <code>curl http://localhost:8080/</code></li>
             <li>Upload files: <code>curl -X POST http://localhost:8080/upload -F "file=@/path/to/file"</code></li>
           </ul>

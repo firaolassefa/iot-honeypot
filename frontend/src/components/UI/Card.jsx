@@ -1,8 +1,18 @@
 import React from 'react'
 
-const Card = ({ children, className = '', ...props }) => {
+const Card = ({ children, style, ...props }) => {
   return (
-    <div className={`liquid-card ${className}`} {...props}>
+    <div
+      style={{
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '12px',
+        padding: '1.5rem',
+        backdropFilter: 'blur(10px)',
+        ...style
+      }}
+      {...props}
+    >
       {children}
     </div>
   )

@@ -23,6 +23,7 @@ const Login = ({ onLogin }) => {
 
       if (response.ok) {
         const data = await response.json()
+        localStorage.setItem('token', data.access_token)
         onLogin(data.access_token)
       } else {
         const errorData = await response.json()
